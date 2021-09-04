@@ -1,3 +1,4 @@
+import dateutil.parser as dp
 from flask import Flask, request
 import json
 import requests
@@ -5,6 +6,7 @@ import requests
 app = Flask(__name__)
 
 CAIYUN_WEATHER_REALTIME_URL = 'https://api.caiyunapp.com/v2.5/{}/{},{}/realtime.json'
+CAIYUN_WEATHER_HOURLY_URL = 'https://api.caiyunapp.com/v2.5/{}/{},{}/hourly.json?unit=metric:v1'
 TOKEN = ''
 
 SUCCESS = 0
@@ -68,6 +70,40 @@ def create_app():
                         'status': SUCCESS,
                         'result': CLEAR
                     }
+
+            except:
+                return {
+                    'status': ERR_INTERNAL_ERROR
+                }
+
+    @app.route('/rain')
+    def rain():
+        lat = request.args.get('lat', -1, type=float)
+        lon = request.args.get('lon', -1, type=float)
+        if lat < -90 or lat > 90 or lon < -180 or lon > 180:
+            return {
+                'status': ERR_INVALID_PARAM
+            }
+        else:
+            try:
+                content = requests.get(
+                    CAIYUN_WEATHER_HOURLY_URL.format(TOKEN, lon, lat)).json()
+
+                precips = []
+                count = 0
+                for precip in content['result']['hourly']['precipitation']:
+                    time = dp.parse(precip['datetime']).timestamp()
+                    value = float(precip['value'])
+                    precips.append({'time': time, 'value': value})
+
+                    count += 1
+                    if count >= 24:
+                        break
+
+                return {
+                    'status': SUCCESS,
+                    'result': precips
+                }
 
             except:
                 return {
